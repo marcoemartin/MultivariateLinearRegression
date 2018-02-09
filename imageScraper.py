@@ -32,9 +32,13 @@ def rgb2gray(rgb):
     rgb -- an RGB image, represented as a numpy array of size n x m x 3. The
     range of the values is 0..255
     '''
-    r, g, b = rgb[:,:,0], rgb[:,:,1], rgb[:,:,2]
-    gray = 0.2989 * r + 0.5870 * g + 0.1140 * b
-    return gray/255.
+    #Ensure the picture is not already in gray scale
+    if rgb.ndim == 3:
+        r, g, b = rgb[:,:,0], rgb[:,:,1], rgb[:,:,2]
+        gray = 0.2989 * r + 0.5870 * g + 0.1140 * b
+        return gray/255.
+    else:
+        return rgb
 
 
 def timeout(func, args=(), kwargs={}, timeout_duration=1, default=None):
@@ -67,6 +71,10 @@ testfile = urllib.URLopener()
 if not os.path.isdir("uncropped/"):
     os.makedirs("uncropped/")
 
+#Creates directory if it does not exist
+if not os.path.isdir("cropped/"):
+    os.makedirs("cropped/")
+
 for a in act:
     name = a.split()[1].lower()
     i = 0
@@ -78,29 +86,42 @@ for a in act:
             #testfile.retrieve(line.split()[4], "uncropped/"+filename)
             #timeout is used to stop downloading images which take too long to download
             timeout(testfile.retrieve, (line.split()[4], "uncropped/"+filename), {}, 30)
-            if not os.path.isfile("uncropped/"+filename):
-                continue
-
             print filename
             try:
 				img = Image.open('uncropped/'+filename) # open the image file
 				img.verify() # verify that it is, in fact an image
             except (IOError, SyntaxError) as e:
-				print('Bad file removed:', filename) # print out the names of corrupt files
-				os.remove('uncropped/'+filename)
+				print("Skipping bad file: "+ filename) # print out the names of corrupt files
+				if os.path.isfile("uncropped/"+filename):
+					os.remove("uncropped/"+filename)
+            else:
+                croparea = line.split()[5].split(',')
+                try:
+                    im = imread("uncropped/"+filename)
+                    img = rgb2gray(im)
+                    crop_face = img[int(croparea[1]):int(croparea[3]), int(croparea[0]): int(croparea[2])]
+                    res = imresize(crop_face,(32, 32))
+                    #Remove old pictures extension
+                    filename = filename.split(".")[0]
+                    imsave("cropped/"+filename+".png", res)
+                except (IOError, SyntaxError) as e:
+                    print("Couldn't read the file " + filename)
+                    print e
+
             i += 1
 
 
-#Creates directory if it does not exist
-if not os.path.isdir("cropped/"):
-    os.makedirs("cropped/")
+# #Creates directory if it does not exist
+# if not os.path.isdir("cropped/"):
+#     os.makedirs("cropped/")
 
-for filename in os.listdir('uncropped/'):
-	try:
-		im = imread(filename)
-		img = rgb2gray(im)
-		crop_face = img[int(croparea[1]):int(croparea[3]), int(croparea[0]): int(croparea[2])]
-		res = imresize(crop_face,(32, 32))
-		imsave("cropped/"+filename, res)
-	except:
-		print("Couldn't read the file " + filename)
+# for filename in os.listdir('uncropped/'):
+# 	try:
+# 		im = imread("uncropped/"+filename)
+# 		img = rgb2gray(im)
+# 		crop_face = img[int(croparea[1]):int(croparea[3]), int(croparea[0]): int(croparea[2])]
+# 		res = imresize(crop_face,(32, 32))
+# 		imsave("cropped/"+filename, res)
+# 	except (IOError, SyntaxError) as e:
+# 		print("Couldn't read the file " + filename)
+# 		print e
